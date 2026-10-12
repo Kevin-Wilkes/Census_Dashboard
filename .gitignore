@@ -1,0 +1,16 @@
+# secrets
+.env
+
+# Python
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+
+# notebooks / editor
+.ipynb_checkpoints/
+.idea/
+
+# large raw data (keep the trimmed parquet, not the raw download)
+data/raw/
