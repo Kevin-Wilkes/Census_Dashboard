@@ -3,7 +3,6 @@ import math
 import pandas as pd
 import plotly.express as px
 
-
 MAP_WIDTH_PX = 1100
 MAP_HEIGHT_PX = 650
 

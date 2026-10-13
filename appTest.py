@@ -1,5 +1,7 @@
 from pathlib import Path
+
 import pandas as pd
+
 from census import client, transform, viz
 
 #this is a simple test to check if the app is working
