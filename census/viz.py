@@ -3,6 +3,7 @@ import math
 import pandas as pd
 import plotly.express as px
 
+
 MAP_WIDTH_PX = 1100
 MAP_HEIGHT_PX = 650
 
@@ -21,34 +22,35 @@ def map_view(df, lat="INTPTLAT", lon="INTPTLONG",
     return center, min(zoom_lon, zoom_lat)
 
 
-def build_map(df: pd.DataFrame, height_px: int = MAP_HEIGHT_PX):
-
-    plot_df = df.dropna(subset=["rent_burden_pct"])
+def build_map(df: pd.DataFrame, metric: str, label: str = "", height_px: int = MAP_HEIGHT_PX):
+    plot_df = df.dropna(subset=[metric])
     center, zoom = map_view(plot_df, height_px=height_px)
 
     fig = px.scatter_map(
         plot_df,
         lat="INTPTLAT", lon="INTPTLONG",
-        color="rent_burden_pct",
+        color=metric,
         size="B01003_001E",
         color_continuous_scale="Viridis",
         hover_name="NAME",
         center=center, zoom=zoom,
         height=height_px,
     )
-    fig.update_layout(margin={"l": 0, "r": 0, "t": 0, "b": 0})
+    fig.update_layout(
+        margin={"l": 0, "r": 0, "t": 0, "b": 0},
+        coloraxis_colorbar_title=label or metric,
+    )
     return fig
 
 
-def build_map_simple(df: pd.DataFrame):
-
-    plot_df = df.dropna(subset=["rent_burden_pct", "INTPTLAT", "INTPTLONG"]).copy()
+def build_map_simple(df: pd.DataFrame, metric: str, label: str = ""):
+    plot_df = df.dropna(subset=[metric, "INTPTLAT", "INTPTLONG"]).copy()
     plot_df["B01003_001E"] = plot_df["B01003_001E"].fillna(0)
 
     fig = px.scatter_geo(
         plot_df,
         lat="INTPTLAT", lon="INTPTLONG",
-        color="rent_burden_pct",
+        color=metric,
         size="B01003_001E",
         size_max=14,
         color_continuous_scale="Viridis",
@@ -56,5 +58,6 @@ def build_map_simple(df: pd.DataFrame):
     )
     fig.update_geos(fitbounds="locations", showland=True, landcolor="#f2f2f2",
                     showsubunits=True, subunitcolor="#bbbbbb")
-    fig.update_layout(height=MAP_HEIGHT_PX, margin={"l": 0, "r": 0, "t": 0, "b": 0})
+    fig.update_layout(height=MAP_HEIGHT_PX, margin={"l": 0, "r": 0, "t": 0, "b": 0},
+                      coloraxis_colorbar_title=label or metric)
     return fig

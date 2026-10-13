@@ -4,6 +4,14 @@ import requests
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 
+from census.transform import INDICATORS
+
+BASE_VARS = ["NAME", "B01003_001E", "B19013_001E", "B19013_001M"]
+INDICATOR_VARS = sorted({v for spec in INDICATORS.values()
+                         for key in ("numerator", "denominator", "subtract")
+                         for v in spec[key]})
+ACS_VARS = BASE_VARS + INDICATOR_VARS
+
 BASE = "https://api.census.gov/data"
 
 class CensusAPIError(Exception):
@@ -68,20 +76,6 @@ def county_codes_in_city(state: str, place: str) -> list[str]:
         "in": f"state:{state.zfill(2)} place:{place.zfill(5)}",
     })
     return [r["county (or part)"] for r in rows if int(r["P1_001N"]) > 0]
-
-
-ACS_VARS = [
-    "NAME",
-    "B01003_001E",                  # total population
-    "B19013_001E", "B19013_001M",   # median household income + margin of error
-    "B25070_001E",                  # total renters
-    "B25070_007E",                  # 30.0–34.9%
-    "B25070_008E",                  # 35.0–39.9%
-    "B25070_009E",                  # 40.0–49.9%
-    "B25070_010E",                  # 50% or more
-    "B25070_011E",                  # not computed
-]
-
 
 #Gathers all tracts that touch city lines even outside of city lines.
 def tracts_for_city(state: str, place: str) -> list[dict]:

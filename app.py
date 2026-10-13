@@ -15,7 +15,7 @@ DEFAULT_STATE = "Texas"
 DEFAULT_CITY = "Austin city"
 ONE_DAY = 60 * 60 * 24
 
-st.set_page_config(page_title="Renter Cost Burden Explorer", layout="wide")
+st.set_page_config(page_title="Census Dashboard Visualizer", layout="wide")
 
 #caching data
 @st.cache_data(ttl=ONE_DAY)
@@ -47,9 +47,9 @@ def short_place_name(full_name: str) -> str:
     return full_name.rsplit(",", 1)[0]
 
 
-st.title("Where are renters most cost-burdened?")
+st.title("Census Dashboard Visualizer")
 st.caption(
-    "Share of renter households spending 30% or more of their income on rent"
+    "A visualization tool for Census Dashboard data. To derive impacted areas with cluster map visualization of data."
 )
 
 try:
@@ -58,7 +58,7 @@ except (client.CensusAPIError, requests.RequestException) as e:
     st.error(f"Couldn't reach the Census API: {e}")
     st.stop()
 
-col_state, col_city = st.columns(2)
+col_state, col_city, col_ind = st.columns(3)
 state = col_state.selectbox(
     "State",
     states,
@@ -80,6 +80,12 @@ place = col_city.selectbox(
     help="Start typing to search.",
 )
 
+indicator = col_ind.selectbox(
+    "Indicator",
+    list(transform.INDICATORS),
+    format_func=lambda k: transform.INDICATORS[k]["label"],
+)
+spec = transform.INDICATORS[indicator]
 
 try:
     with st.spinner(f"Fetching Census data for {short_place_name(place['NAME'])}..."):
@@ -99,46 +105,46 @@ if not has_burden.any():
 # Summary metrics
 m1, m2, m3, m4 = st.columns(4)
 m1.metric("Census tracts", f"{len(df):,}")
-m2.metric("Median tract rent burden", f"{df['rent_burden_pct'].median():.1f}%")
+m2.metric("Median tract " + spec["short_label"], f"{df[indicator].median():.1f}%")
 m3.metric(
-    "Tracts where most renters are burdened",
-    f"{(df['rent_burden_pct'] > 50).sum():,}",
-    help="Tracts where over 50% of renter households spend 30%+ of income on rent.",
+    "Tracts where a majority suffer from " + spec["short_label"],
+    f"{(df[indicator] > 50).sum():,}",
+    help="Tracts where over 50% of the population suffer from " + spec["short_label"],
 )
-m4.metric(
-    "Low-reliability estimates",
-    f"{(~df['reliable']).sum():,}",
-    help="Tracts whose median income estimate has a coefficient of variation above 30%.",
-)
+num = df[spec["numerator"]].sum(axis=1).sum()
+den = (df[spec["denominator"]].sum(axis=1) - df[spec["subtract"]].sum(axis=1)).sum()
+m4.metric("Area-wide rate", f"{num / den * 100:.1f}%",
+          help="All tracts combined, not an average of tract percentages.")
 
 #printing the map
-st.plotly_chart(viz.build_map(df), use_container_width=True)
+st.plotly_chart(viz.build_map(df, metric=indicator, label=spec["label"]), use_container_width=True)
+
 
 #top 10 board with option
-st.subheader("Most cost-burdened tracts")
+has_value = df[indicator].notna()
 
-top10 = (
-    df[has_burden]
-    .nlargest(10, "rent_burden_pct")[
-        ["NAME", "rent_burden_pct", "B19013_001E", "B01003_001E"]
-    ]
-)
+st.subheader(f"Top 10 tracts: {spec['short_label'].lower()}")
+st.caption(spec["label"])
+
+top10 = df[has_value].nlargest(10, indicator)[
+    ["NAME", indicator, "B19013_001E", "B01003_001E"]
+]
+
 st.dataframe(
     top10,
     hide_index=True,
     use_container_width=True,
     column_config={
-        "NAME": st.column_config.TextColumn("Tract"),
-        "rent_burden_pct": st.column_config.NumberColumn("% renters burdened", format="%.1f%%"),
-        "B19013_001E": st.column_config.NumberColumn("Median household income", format="$%,.0f"),
-        "B01003_001E": st.column_config.NumberColumn("Population", format="%,d"),
+        "NAME": st.column_config.TextColumn("Tract", width="large"),
+        indicator: st.column_config.NumberColumn(spec["short_label"], format="%.1f%%"),
+        "B19013_001E": st.column_config.NumberColumn("Median household income", format="dollar"),
+        "B01003_001E": st.column_config.NumberColumn("Population", format="localized"),
     },
 )
 
 st.download_button(
     "Download all tract data (CSV)",
     data=df.to_csv(index=False).encode("utf-8"),
-    file_name=f"rent_burden_{state['state']}{place['place']}.csv",
+    file_name=f"tract_data_{state['state']}{place['place']}.csv",
     mime="text/csv",
 )
-
